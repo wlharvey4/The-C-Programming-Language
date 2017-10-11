@@ -3,7 +3,7 @@
  * ----------------------
  *
  * OCTOBER 10, 2017
- * VERSION 0.4_c
+ * VERSION 0.5_alt
  *
  * DIRECTIONS:
  * ===========
@@ -26,7 +26,7 @@
 
 #include "./simple_image_machine.h"
 
-#define VERSION 0.4_b
+#define VERSION 0.5_alt
 #define USAGE "USAGE: simple_image_machine -o <outputfile>.ppm template1 <x1> <y1> template2 <x2> <y2> ...\n"
 
 /* *************************************************************************
@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
 
   /* FIRST, option processing: -o outputfile | -h */
   char* outputfile = outputFilename(argc, argv);
+  fprintf(stderr, "-o %s\n", outputfile);
 
   /* SECOND, create and initialize with all white an array that holds r,g,b color values */
   PIXEL** imagebuffer = malloc(sizeof(void*) * HEIGHT);
@@ -43,6 +44,7 @@ int main(int argc, char** argv) {
     imagebuffer[row] = calloc(WIDTH, PIXEL_S);
   }
   fillBuffer(imagebuffer, WHITE);
+  fprintf(stderr, "Created image buffer\n");
   /* displayImageBuffer(imagebuffer); */
 
   /* THIRD, loop over template files given on command line, load them, and overlay them */
@@ -51,13 +53,22 @@ int main(int argc, char** argv) {
     TEMPLATE* template = loadTemplate(argv, f);
     f += 3;
     
-    /*   overlay(template); /\* overlay the template data on the buffer file *\/ */
-    /*   free(template->buff); */
-  }
-  /* writePPM(outputfile); /\* write the imagebuffer to an output file *\/ */
+    overlay(imagebuffer, template);
+    fprintf(stderr, "Overlaid template data onto image buffer\n");
 
-  /* free(imagebuffer); */
-  /* return 0; */
+    /* cleanup template memory */
+    free(template->buff);
+    free(template);
+  }
+
+  /* FOURTH, write out a PPM file to the file system */
+  writePPM(outputfile, imagebuffer);
+  fprintf(stderr, "DONE\n");
+
+  /* CLEAN UP */
+  free(imagebuffer);
+
+  return 0;
 }
 /***************************************************************************
  * END MAIN
@@ -93,7 +104,6 @@ beginning of the template file as two numbers and a newline: `xxx yyy \\n'.\n");
     fprintf(stderr, USAGE);
     exit(1);
   }
-  /* getopt successfully optained the output file name; contained in optarg */
   return optarg;
 }
 
@@ -132,12 +142,13 @@ void fillBuffer(PIXEL** buff, PIXEL fill) {
  * ------------                                                            *
  * Loads a template as given on the command line                           *
  *                                                                         *
- * parameters: char* filename                                              *
- *             TEMPLATE* template                                          *
+ * parameters: char** argv (holds template name and stampe point)          *
+ *             int (current index into argv)                               *
  * returns:    PIXEL_T (size of template in pixels)                        *
  ***************************************************************************/
 TEMPLATE* loadTemplate(char** argv, int f) {
-  TEMPLATE* template;
+  TEMPLATE* template = malloc(sizeof(TEMPLATE));; /* SOURCE OF ERROR PRODUCING RANDOM SEG FAULTS;
+                                                     NEEDED TO MALLOC MEMORY FOR THE TEMPLATE STRUCTURE */
 
   char* name = argv[f++];
   int start_x = atoi(argv[f++]);
@@ -165,9 +176,6 @@ TEMPLATE* loadTemplate(char** argv, int f) {
     printf("pixels read = %d\n", pixelsRead);
     fclose(fp);
 
-    /* printf("read %d pixels from %s\n", pixelsRead, template->name); */
-    /* displayBuffer(template); */
-    
   } else {
     fprintf(stderr, "can't open file %s\n", name);
     exit(1);
@@ -195,7 +203,7 @@ void overlay(PIXEL** imagebuffer, TEMPLATE* template) {
       if (!(pixel->red == 0 && pixel->green == 0 && pixel->blue == 0)) { 
           imagebuffer[row][col] = *pixel;
         }
-      p += PIXEL_S;
+      p++;
     }
   }
 }
@@ -223,19 +231,27 @@ void writePPM(char* outputfile, PIXEL** imagebuffer) {
       fprintf(stderr, "error writing header information to output file %s\n", outputfile);
       exit(1);
     }
-    int written;
-    if ((written = fwrite(imagebuffer, PIXEL_S, BUFSIZE, fp)) != BUFSIZE) { /* I THINK THIS IS SOURCE OF ERROR
-                                                                               BUFSIZE SHOULD BE 3X AS BIG
-                                                                               TO ACCOUNT FOR PIXEL_S BEING 
-                                                                               3 BYTES */
-      fprintf(stderr, "ERROR writing image buffer; wrote [%d] bytes out of [%lu] possible\n", written, BUFSIZE);
-      exit(1);
+
+    PIXEL_T written, pixels;
+    for (int row = 0; row < HEIGHT; row++) {
+      if ((pixels = fwrite(imagebuffer[row], PIXEL_S, WIDTH, fp)) != WIDTH) {
+        fprintf(stderr, "ERROR writing image buffer row %d; wrote [%d] bytes out of [%u] possible\n", row, written, BUFSIZE);
+        exit(EXIT_FAILURE);
+      }
+      written += pixels;
+    }
+
+    if (written != BUFSIZE) {
+      fprintf(stderr, "ERROR writing image buffer; wrote %d pixels out of %u possible\n", written, BUFSIZE);
+      exit (EXIT_FAILURE);
     }
     fclose(fp);
+    fprintf(stderr, "SUCCESSFULLY wrote %d pixels out of a possible %u possible\n", written, BUFSIZE);
   }
+
   else {
     fprintf(stderr, "error opening a file for writing to\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -254,7 +270,7 @@ PIXEL makeColor(color red, color green, color blue) {
 /***************************************************************************
  * showColors                                                              *
  * ----------                                                              *
- * Given a PIXEL, print out its components for debuggin                    *
+ * Given a PIXEL, print out its components for debugging                   *
  *                                                                         *
  * parameters; PIXEL* p                                                    *
  * returns:    void                                                        *
@@ -266,7 +282,7 @@ void showColors(PIXEL* p) {
 /***************************************************************************
  * displayBuffer                                                           *
  * -------------                                                           *
- * Given a template, print out its components for debuggin                 *
+ * Given a template, print out its components for debugging                *
  *                                                                         *
  * parameters: TEMPLATE* template                                          *
  * returns:    void                                                        *

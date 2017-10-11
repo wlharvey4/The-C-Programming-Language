@@ -3,7 +3,7 @@
  * ----------------------
  * 
  * OCTOBER 10, 2017
- * VERSION 0.4_c
+ * VERSION 0.5_alt
  *
  ***************************************************************************************************/
 
@@ -62,7 +62,7 @@ typedef struct {
 /* SOURCE OF ERROR? BUFSIZE SHOULD BE 3X AS BIG BECAUSE OF PIXEL_S? */
 #define WIDTH 100
 #define HEIGHT 100
-#define BUFSIZE PIXEL_S * WIDTH * HEIGHT
+#define BUFSIZE (PIXEL_T)(WIDTH * HEIGHT)
 
 /* PIXEL INFORMATION */
 #define PIXEL_S sizeof(PIXEL)
